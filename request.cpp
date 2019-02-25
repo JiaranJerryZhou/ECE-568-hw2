@@ -146,7 +146,7 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache) {
       send_index += 100;
     }
     cout << response.data() << endl;
-    mycache.saveCache(my_request[0], response.data());
+    mycache.saveCache(my_request[0], response);
     close(conn_fd);
   }
 }

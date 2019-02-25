@@ -16,9 +16,9 @@
 
 using namespace std;
 
-void cache::saveCache(string req, char *r) {
+void cache::saveCache(string req, vector<char> r) {
   // unordered_map<string, string>::iterator pos = way.find(req);
-  string resp = r;
+  string resp = r.data();
   // cout << "to save" << endl;
   // cout << resp << endl;
   response curr(resp);
@@ -50,7 +50,7 @@ void cache::saveCache(string req, char *r) {
     url = url.substr(0, url.find(' '));
     cout << "NOTE evicted " << url << " from cache" << endl;
     way.erase(way.begin());
-    pair<string, string> curr = make_pair(req, resp);
+    pair<string, vector<char>> curr = make_pair(req, r);
     way.insert(curr);
     return;
   } else {
@@ -64,12 +64,12 @@ void cache::saveCache(string req, char *r) {
     } else {
       cout << "cached" << endl;
     }
-    pair<string, string> curr = make_pair(req, resp);
+    pair<string, vector<char>> curr = make_pair(req, r);
     way.insert(curr);
     for (auto c : way) {
       cout << "in way: " << endl;
       cout << c.first << endl;
-      cout << c.second << endl;
+      cout << c.second.data() << endl;
     }
     //    cout << req << endl;
     // cout << resp << "has been cached" << endl;
@@ -83,10 +83,11 @@ bool cache::getCache(string req, int client_fd) {
   for (auto c : way) {
     cout << "in way: " << endl;
     cout << c.first << endl;
-    cout << c.second << endl;
+    cout << c.second.data() << endl;
   }
   if (way.find(req) != way.end()) {
-    string resp = way[req];
+    vector<char> r = way[req];
+    string resp = r.data();
     response curr(resp);
     // curr.parse_response();
     string control = curr.get_cache_control();
@@ -117,7 +118,7 @@ bool cache::getCache(string req, int client_fd) {
         int sbyte;
         int send_index = 0;
         // const char *r = resp.c_str();
-        while ((sbyte = send(client_fd, &resp[send_index], 100, 0)) == 100) {
+        while ((sbyte = send(client_fd, &r[send_index], 100, 0)) == 100) {
           send_index += 100;
         }
         cout << resp << endl;

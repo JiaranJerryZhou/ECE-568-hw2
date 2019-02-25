@@ -21,12 +21,12 @@ private:
   int cap;
   int size;
   // request is key, response is value
-  map<string, string> way;
+  map<string, vector<char>> way;
 
 public:
   cache() : cap(100), size(0){};
   cache(int capacity) : cap(capacity), size(0){};
-  void saveCache(string req, char *resp);
+  void saveCache(string req, vector<char> resp);
   bool getCache(string req, int client_fd);
 };
 
