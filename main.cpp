@@ -48,19 +48,15 @@ void my_proxy_func(int client_connection_fd, MyProxy myproxy) {
     std::string header_mes(header.begin(), header.end());
     if (header_mes == "") {
       return;
-      // return -1;
     }
     std::cout << "~~~~~~```ALL RECEVIE~~~~" << std::endl;
     ClientRequest clientrequest;
-    clientrequest.parse_request(header_mes.c_str());
-    std::cout << "**************xAfter parse************" << std::endl;
-    clientrequest.handle_request(myproxy, mycache);
+    //clientrequest.parse_request(header_mes.c_str());
+    clientrequest.handle_request(myproxy, mycache,header_mes.c_str());
     return;
-    // return 0;
   } else {
-    std::cerr << "$$$$`````INVAILD HEADER!``````$$$$" << std::endl;
+    std::cerr << "`````INVAILD HEADER!``````" << std::endl;
     return;
-    // return -1;
   }
 }
 
@@ -79,7 +75,7 @@ int main(int argc, char *argv[]) {
       continue;
     }
     try {
-      /*
+      
       int find=0;
       std::vector<char> header(1, 0);
       int index = 0;
@@ -107,21 +103,22 @@ int main(int argc, char *argv[]) {
         }
         std::cout<< "~~~~~~```ALL RECEVIE~~~~"<<std::endl;
         ClientRequest clientrequest;
-        clientrequest.parse_request(header_mes.c_str());
-        std::cout <<"**************xAfter parse************"<<std::endl;
-        clientrequest.handle_request(myproxy);
+        //clientrequest.parse_request(header_mes.c_str());
+        //std::cout <<"**************xAfter parse************"<<std::endl;
+        clientrequest.handle_request(myproxy,mycache,header_mes.c_str());
       }
       else{
         std::cerr<<"$$$$`````INVAILD HEADER!``````$$$$"<<std::endl;
         continue;
       }
-      */
+      /*
       std::thread my_thread(my_proxy_func, client_connection_fd, myproxy);
       // int check = my_proxy_func(client_connection_fd,myproxy);
       my_thread.detach();
       // if(check==-1){
       // continue;
       //}
+      */
       std::cout << "-------DONE-------" << std::endl;
     } catch (std::exception &e) {
       close(socket_fd);

@@ -61,6 +61,15 @@ void ClientRequest::get_method() {
 }
 
 void ClientRequest::check_http() {
+  if(client_request.find("https")!=std::string::npos){
+    protocal_type = 1;
+  }
+  else if(client_request.find("http")!=std::string::npos){
+    protocal_type = 0;
+  }
+}
+
+  /*
   size_t pos1 = my_request[0].find(" ");
   http = my_request[0].substr(pos1 + 1);
   size_t pos2 = http.find(":");
@@ -71,7 +80,7 @@ void ClientRequest::check_http() {
   } else if (http == "https") {
     protocal_type = 1;
   }
-}
+  */
 
 void ClientRequest::get_hostname() {
   get_method();
@@ -94,10 +103,35 @@ void ClientRequest::get_hostname() {
 
 void ClientRequest::merge_request() {}
 
-void ClientRequest::handle_request(MyProxy myproxy, cache &mycache) {
-  get_method();
-  get_hostname();
-  // merge_request();
+void ClientRequest::handle_request(MyProxy myproxy, cache &mycache,const char *request) {
+  client_request = request;
+  if(client_request.find("GET")!=std::string::npos){
+    Method = "GET";
+  }
+  if(client_request.find("POST")!=std::string::npos){
+    Method = "POST";
+  }
+  if(client_request.find("CONNECT")!=std::string::npos){
+    Method = "CONNECT";
+  }
+  size_t pos = client_request.find("Host");
+  if(pos!=std::string::npos){
+    Host = client_request.substr(pos);
+    size_t pos2 = Host.find(" ");
+    Host = Host.substr(pos2);
+    size_t pos3 = Host.find("\r");
+    Host[pos3]='\0';
+    Host = Host.substr(1,pos3);
+    cout<<Host<<endl;
+    size_t com = Host.find(":");
+    if(com!=std::string::npos){
+      Host = Host.substr(0,com);
+      Host.push_back('\0');
+      cout<<com<<endl;
+    }
+  }
+  
+
   if (Method == "GET") {
     handle_get(myproxy, mycache);
   } else if (Method == "POST") {
@@ -117,38 +151,75 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache) {
   if (protocal_type == 1) {
     conn_fd = myproxy.connect_with_server(Host.c_str(), "443");
   }
-  cout << "request is" << endl;
-  cout << my_request[0] << endl;
   if (!mycache.getCache(my_request[0], client_connection_fd)) {
     send(conn_fd, client_request.c_str(), client_request.size(), 0);
     vector<char> response(1, 0);
     int nbytes;
     int index = 0;
-    while ((nbytes = recv(conn_fd, &response.data()[index], 1, MSG_WAITALL)) >
-           0) {
-      // cout<<"index "<<index<<"response[index]: "<<response.data()<<endl;
-      if (response.size() > 5) {
+    while ((nbytes = recv(conn_fd, &response.data()[index], 1, 0)) >0) {
+      if (response.size() > 4) {
         size_t size = response.size();
         if (response.back() == '\n' && response[size - 2] == '\r' &&
-            response[size - 3] == '\n' && response[size - 4] == '\r' &&
-            response[size - 5] == '0') { // find the end of chunk
+            response[size - 3] == '\n' && response[size - 4] == '\r') { // find the end of header
+	  response.push_back('\0');
           break;
         }
       }
       response.resize(response.size() + 1);
       index += nbytes;
     }
-    cout << "Respose: " << endl;
+    cout<<"Header "<<response.data()<<endl;
+    string response_header(response.begin(),response.end());
+    vector<char> response_body(1,0);
+    int receiving;
+    int i=0;
+    if(response_header.find("chunked")!=std::string::npos){
+      while ((receiving = recv(conn_fd, &response_body.data()[i], 1, 0)) > 0){
+	if(response_body.size()>4){
+	  size_t size = response_body.size();
+	  if(response_body.back()=='\n' &&response_body[size-2]=='\r'&&response_body[size-3]=='\n'&&response_body[size-4]=='\r'){//find the end of header
+	    break;
+	  }
+	}
+	response_body.resize(response_body.size() + 1);
+	i += receiving;
+      }
+    }
+    else if(size_t found = response_header.find("Content-Length")!=std::string::npos){
+      string temp = response_header.substr(found);
+      found = temp.find(" ");
+      temp=temp.substr(found);
+      found = temp.find("\r");
+      temp= temp.substr(0,found);
+      int response_body_len = atoi(temp.c_str());
+      cout<<"Keep Receiving"<<endl;
+      while ((receiving = recv(conn_fd, &response_body.data()[i], 1, 0)) > 0&&i<response_body_len) {
+   	if(i == response_body_len-1){
+	  break;
+	}
+	response_body.resize(response_body.size() + 1);
+	i += receiving;
+      }
+    }
+  
+    response_body.push_back('\0'); 
+
+    int client_connection_fd = myproxy.get_client_fd();
     int sbyte;
     int send_index = 0;
-    while ((sbyte = send(client_connection_fd, &response.data()[send_index],
-                         100, 0)) == 100) {
-      send_index += 100;
+    response.resize(response.size()-1);
+    response.insert(response.end(), response_body.begin(), response_body.end());
+    response.push_back('\0');
+    response.resize(response.size()-2);
+  
+    cout<<response.size()<<endl;
+    while(send_index<(int)response.size()){
+      sbyte = send(client_connection_fd, &response.data()[send_index],response.size()-send_index,0);
+      send_index +=sbyte;
     }
-    cout << response.data() << endl;
     mycache.saveCache(my_request[0], response);
-    close(conn_fd);
   }
+  close(conn_fd);
 }
 
 string ClientRequest::get_header() { return header; }
