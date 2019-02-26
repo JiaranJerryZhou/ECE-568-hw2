@@ -169,7 +169,7 @@ void ClientRequest::handle_post(MyProxy myproxy) {
   int i = 0;
   int s;
   while ((s = recv(myproxy.get_client_fd(), &content.data()[i], 1, 0)) > 0 &&
-         s < length) {
+         i < length) {
     content.resize(content.size() + 1);
     i += s;
     if (i == length) {
@@ -260,7 +260,9 @@ void ClientRequest::handle_connect(MyProxy myproxy) {
         response.resize(nbytes);
         if (nbytes == 0) {
           sign_break = 1;
-          break;
+	  close(conn_fd);
+	  close(client_fd);
+	  break;
         }
         int other;
         if (i == 0) {
@@ -268,7 +270,11 @@ void ClientRequest::handle_connect(MyProxy myproxy) {
         } else {
           other = 0;
         }
-        send(fd_list[other], &response.data()[0], nbytes, 0);
+        int sent=0;
+         while(sent<nbytes){
+           int temp = send(fd_list[other],&response.data()[sent],nbytes-sent,0);
+	   sent += temp;
+	 }
       }
     }
     if (sign_break == 1) {
