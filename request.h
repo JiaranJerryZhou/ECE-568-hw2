@@ -36,8 +36,9 @@ public:
   void check_http();
   void get_hostname();
   void merge_request();
-  void handle_request(MyProxy myproxy, cache &mycache,const char *request);
-  void handle_get(MyProxy myproxy, cache &mycache);
+  void handle_request(MyProxy myproxy, cache &mycache, int thread_id,
+                      const char *request);
+  void handle_get(MyProxy myproxy, cache &mycache, int thread_id);
   void handle_post(MyProxy myproxy);
   void handle_connect(MyProxy myproxy);
 };

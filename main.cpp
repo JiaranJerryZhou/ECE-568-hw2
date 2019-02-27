@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -16,47 +17,52 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
-
 cache mycache;
-
+std::mutex mtx;
 // using namespace std;
-void my_proxy_func(int client_connection_fd, MyProxy myproxy) {
-  int find = 0;
-  std::vector<char> header(1, 0);
-  int index = 0;
-  int nbytes;
-  while ((nbytes = recv(client_connection_fd, &header.data()[index], 1,
-                        MSG_WAITALL)) > 0) {
-    if (header.size() > 4) {
-      if (header.back() == '\n' && header[header.size() - 2] == '\r' &&
-          header[header.size() - 3] == '\n' &&
-          header[header.size() - 4] == '\r') {
-        std::cout << "GOT HEADER!" << std::endl;
-        find = 1;
-        break;
+void my_proxy_func(int client_connection_fd, MyProxy myproxy, int thread_id) {
+  try {
+    std::lock_guard<std::mutex> lck(mtx);
+    int find = 0;
+    std::vector<char> header(1, 0);
+    int index = 0;
+    int nbytes;
+    while ((nbytes = recv(client_connection_fd, &header.data()[index], 1,
+                          MSG_WAITALL)) > 0) {
+      if (header.size() > 4) {
+        if (header.back() == '\n' && header[header.size() - 2] == '\r' &&
+            header[header.size() - 3] == '\n' &&
+            header[header.size() - 4] == '\r') {
+          std::cout << "GOT HEADER!" << std::endl;
+          find = 1;
+          break;
+        }
       }
-    }
 
-    header.resize(header.size() + 1);
-    index += nbytes;
-  }
-  // if(header.size()<2){
-  // continue;
-  //}
-  if (find == 1) {
-    std::cout << header.data() << std::endl;
-    std::string header_mes(header.begin(), header.end());
-    if (header_mes == "") {
+      header.resize(header.size() + 1);
+      index += nbytes;
+    }
+    // if(header.size()<2){
+    // continue;
+    //}
+    if (find == 1) {
+      std::cout << header.data() << std::endl;
+      std::string header_mes(header.begin(), header.end());
+      if (header_mes == "") {
+        return;
+      }
+      std::cout << "~~~~~~```ALL RECEVIE~~~~" << std::endl;
+      ClientRequest clientrequest;
+      clientrequest.parse_request(header_mes.c_str());
+      clientrequest.handle_request(myproxy, mycache, thread_id,
+                                   header_mes.c_str());
+      return;
+    } else {
+      std::cerr << "`````INVAILD HEADER!``````" << std::endl;
       return;
     }
-    std::cout << "~~~~~~```ALL RECEVIE~~~~" << std::endl;
-    ClientRequest clientrequest;
-    //clientrequest.parse_request(header_mes.c_str());
-    clientrequest.handle_request(myproxy, mycache,header_mes.c_str());
-    return;
-  } else {
-    std::cerr << "`````INVAILD HEADER!``````" << std::endl;
-    return;
+  } catch (std::logic_error &) {
+    std::cout << "exception catched" << endl;
   }
 }
 
@@ -66,6 +72,7 @@ int main(int argc, char *argv[]) {
   int socket_fd = myproxy.set_up_socket();
   std::cout << "Socket " << socket_fd << " set up done!" << std::endl;
   std::cout << "Waiting for connection...on port 12345" << std::endl;
+  int thread_id = 0;
   while (1) {
 
     std::cout << "SOCKET FD: " << socket_fd << std::endl;
@@ -75,15 +82,18 @@ int main(int argc, char *argv[]) {
       continue;
     }
     try {
-      
-      int find=0;
+      /*
+      int find = 0;
       std::vector<char> header(1, 0);
       int index = 0;
       int nbytes;
       while ((nbytes = recv(client_connection_fd, &header.data()[index], 1,
-      MSG_WAITALL)) > 0) { if(header.size()>4){
-          if(header.back()=='\n'&&header[header.size()-2]=='\r'&&header[header.size()-3]=='\n'&&header[header.size()-4]=='\r'){
-            std::cout<<"GOT HEADER!"<<std::endl;
+                            MSG_WAITALL)) > 0) {
+        if (header.size() > 4) {
+          if (header.back() == '\n' && header[header.size() - 2] == '\r' &&
+              header[header.size() - 3] == '\n' &&
+              header[header.size() - 4] == '\r') {
+            std::cout << "GOT HEADER!" << std::endl;
             find = 1;
             break;
           }
@@ -92,33 +102,36 @@ int main(int argc, char *argv[]) {
         header.resize(header.size() + 1);
         index += nbytes;
       }
-      //if(header.size()<2){
-      //continue;
+      // if(header.size()<2){
+      // continue;
       //}
-      if(find==1){
+      if (find == 1) {
         std::cout << header.data() << std::endl;
-        std::string header_mes(header.begin(),header.end());
-        if(header_mes==""){
+        std::string header_mes(header.begin(), header.end());
+        if (header_mes == "") {
           continue;
         }
-        std::cout<< "~~~~~~```ALL RECEVIE~~~~"<<std::endl;
+        std::cout << "~~~~~~```ALL RECEVIE~~~~" << std::endl;
         ClientRequest clientrequest;
-        //clientrequest.parse_request(header_mes.c_str());
-        //std::cout <<"**************xAfter parse************"<<std::endl;
-        clientrequest.handle_request(myproxy,mycache,header_mes.c_str());
-      }
-      else{
-        std::cerr<<"$$$$`````INVAILD HEADER!``````$$$$"<<std::endl;
+        clientrequest.parse_request(header_mes.c_str());
+        // std::cout <<"**************xAfter parse************"<<std::endl;
+        clientrequest.handle_request(myproxy, mycache, header_mes.c_str());
+      } else {
+        std::cerr << "$$$$`````INVAILD HEADER!``````$$$$" << std::endl;
         continue;
       }
-      /*
-      std::thread my_thread(my_proxy_func, client_connection_fd, myproxy);
+      */
+      std::thread my_thread(my_proxy_func, client_connection_fd, myproxy,
+                            thread_id);
+      thread_id++;
+      // cout << "current thread id is: " << thread_id << endl;
       // int check = my_proxy_func(client_connection_fd,myproxy);
       my_thread.detach();
       // if(check==-1){
       // continue;
+
       //}
-      */
+
       std::cout << "-------DONE-------" << std::endl;
     } catch (std::exception &e) {
       close(socket_fd);

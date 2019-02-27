@@ -27,7 +27,7 @@ void response::parse_response() {
     // cout << my_response[i] << endl;
     i++;
   }
-  // get_expire_time();
+  // get_expire_time(0);
   // get_date();
 }
 
@@ -85,7 +85,9 @@ bool response::get_status() {
 bool response::check_expire() {
   // modify time with current time
   age = convert_age();
+  // cout << "age: " << age << endl;
   maxAge = convert_maxAge();
+  // cout << "maxage: " << maxAge << endl;
   modify_date(time(0));
   if (age > maxAge) {
     return true;

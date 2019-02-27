@@ -1,6 +1,7 @@
 #ifndef __CACHE_H_
 #define __CACHE_H_
 #include "response.h"
+
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -21,13 +22,14 @@ private:
   int cap;
   int size;
   // request is key, response is value
-  map<string, vector<char>> way;
+  map<string, pair<vector<char>, int>> way;
+  // pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 public:
-  cache() : cap(100), size(0){};
+  cache() : cap(10), size(0){};
   cache(int capacity) : cap(capacity), size(0){};
-  void saveCache(string req, vector<char> resp);
-  bool getCache(string req, int client_fd);
+  void saveCache(string req, vector<char> resp, int thread_id);
+  bool getCache(string req, int client_fd, int thread_id);
 };
 
 #endif

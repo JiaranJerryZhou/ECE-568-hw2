@@ -1,22 +1,27 @@
 #include <cstdlib>
 #include <iostream>
+#include <mutex>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <time.h>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
 #include "cache.h"
-#include "response.h"
 
+#include "response.h"
 using namespace std;
 
-void cache::saveCache(string req, vector<char> r) {
+void cache::saveCache(string req, vector<char> r, int thread_id) {
+
+  pair<vector<char>, int> info(r, thread_id);
+  //  pthread_mutex_lock(&lock);
   // unordered_map<string, string>::iterator pos = way.find(req);
   string resp = r.data();
   // cout << "to save" << endl;
@@ -35,11 +40,13 @@ void cache::saveCache(string req, vector<char> r) {
   // cannot be cached
   if (control.find("no cache") != string::npos ||
       control.find("no store") != string::npos) {
+    cout << "ID: " << thread_id;
     cout << "not cacheable because " << control << endl;
     return;
   }
   // not 200 OK
   if (!curr.get_status()) {
+    cout << "ID: " << thread_id;
     cout << "not cacheable because not 200 OK" << endl;
     return;
   }
@@ -48,9 +55,10 @@ void cache::saveCache(string req, vector<char> r) {
     string to_evict = way.begin()->first;
     string url = to_evict.substr(to_evict.find(' ') + 1);
     url = url.substr(0, url.find(' '));
+    cout << "(no id) ";
     cout << "NOTE evicted " << url << " from cache" << endl;
     way.erase(way.begin());
-    pair<string, vector<char>> curr = make_pair(req, r);
+    pair<string, pair<vector<char>, int>> curr = make_pair(req, info);
     way.insert(curr);
     return;
   } else {
@@ -58,76 +66,113 @@ void cache::saveCache(string req, vector<char> r) {
     if (!expire_time.empty()) {
       // need revalidate
       if (control.find("must-revalidate") != string::npos) {
+        cout << "ID: " << thread_id;
         cout << "cached, but requires revalidation" << endl;
       }
+      cout << "ID: " << thread_id;
       cout << "cached, but expires at " << expire_time << endl;
     } else {
+      cout << "ID: " << thread_id;
       cout << "cached" << endl;
     }
-    pair<string, vector<char>> curr = make_pair(req, r);
+    pair<string, pair<vector<char>, int>> curr = make_pair(req, info);
     way.insert(curr);
     for (auto c : way) {
       cout << "in way: " << endl;
+      cout << c.second.second << endl;
       cout << c.first << endl;
-      cout << c.second.data() << endl;
+      cout << c.second.first.data() << endl;
     }
     //    cout << req << endl;
     // cout << resp << "has been cached" << endl;
     size++;
     return;
   }
+  // pthread_mutex_unlock(&lock);
 }
 
-bool cache::getCache(string req, int client_fd) {
+bool cache::getCache(string req, int client_fd, int thread_id) {
   // find req in cache
+  // pthread_mutex_lock(&lock);
   for (auto c : way) {
     cout << "in way: " << endl;
+    cout << c.second.second << endl;
     cout << c.first << endl;
-    cout << c.second.data() << endl;
+    cout << c.second.first.data() << endl;
   }
   if (way.find(req) != way.end()) {
-    vector<char> r = way[req];
+    int id = way[req].second;
+    vector<char> r = way[req].first;
     string resp = r.data();
     response curr(resp);
     // curr.parse_response();
     string control = curr.get_cache_control();
     if (control.find("must-revalidate") != string::npos) {
+      cout << "ID: " << id;
       cout << "in cache, requires validation" << endl;
+      way.erase(way.find(req));
       return false;
     }
     // never expires
     string expire_time = curr.get_expire_time();
     string curr_time = curr.get_date();
     if (expire_time.empty()) {
+      cout << "ID: " << id;
       cout << "in cache, valid" << endl;
       cout << "Responding HTTP/1.1 200 OK" << endl;
       //      send(client_fd, &resp, resp.size(), 0);
+
       int sbyte;
       int send_index = 0;
-      while ((sbyte = send(client_fd, &resp[send_index], 100, 0)) == 100) {
+      int size = r.size();
+
+      while (send_index < size) {
+        sbyte = send(client_fd, &r[send_index], size - send_index, 0);
+        send_index += sbyte;
+        cout << sbyte << endl;
+      }
+
+      /*
+      while ((sbyte = send(client_fd, &r[send_index], 100, 0)) == 100) {
         send_index += 100;
       }
+      */
       return true;
     } else {
       if (curr.check_expire()) {
+        cout << "ID: " << id;
         cout << "in cache, but expires at " << expire_time << endl;
+        way.erase(way.find(req));
         return false;
       } else {
+        cout << "ID: " << id;
         cout << "in cache, valid" << endl;
         //        send(client_fd, &resp, resp.size(), 0);
+
         int sbyte;
         int send_index = 0;
         // const char *r = resp.c_str();
-        while ((sbyte = send(client_fd, &r[send_index], 100, 0)) == 100) {
-          send_index += 100;
+        int size = r.size();
+        while (send_index < size) {
+          sbyte = send(client_fd, &r[send_index], size - send_index, 0);
+          send_index += sbyte;
+          cout << sbyte << endl;
         }
+
+        /*
+          while ((sbyte = send(client_fd, &r[send_index], 100, 0)) == 100) {
+            send_index += 100;
+          }
+        */
         cout << resp << endl;
         close(client_fd);
         return true;
       }
     }
   } else {
+    cout << "ID: " << thread_id;
     cout << "not in cache" << endl;
     return false;
   }
+  // pthread_mutex_unlock(&lock);
 }
