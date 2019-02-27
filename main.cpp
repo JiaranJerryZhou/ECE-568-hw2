@@ -33,7 +33,7 @@ void my_proxy_func(int client_connection_fd, MyProxy myproxy, int thread_id) {
         if (header.back() == '\n' && header[header.size() - 2] == '\r' &&
             header[header.size() - 3] == '\n' &&
             header[header.size() - 4] == '\r') {
-          std::cout << "GOT HEADER!" << std::endl;
+          //std::cout << "GOT HEADER!" << std::endl;
           find = 1;
           break;
         }
@@ -46,19 +46,19 @@ void my_proxy_func(int client_connection_fd, MyProxy myproxy, int thread_id) {
     // continue;
     //}
     if (find == 1) {
-      std::cout << header.data() << std::endl;
+      //std::cout << header.data() << std::endl;
       std::string header_mes(header.begin(), header.end());
       if (header_mes == "") {
         return;
       }
-      std::cout << "~~~~~~```ALL RECEVIE~~~~" << std::endl;
+      //std::cout << "~~~~~~```ALL RECEVIE~~~~" << std::endl;
       ClientRequest clientrequest;
       clientrequest.parse_request(header_mes.c_str());
       clientrequest.handle_request(myproxy, mycache, thread_id,
                                    header_mes.c_str());
       return;
     } else {
-      std::cerr << "`````INVAILD HEADER!``````" << std::endl;
+      //std::cerr << "`````INVAILD HEADER!``````" << std::endl;
       return;
     }
   } catch (std::logic_error &) {
