@@ -1,8 +1,10 @@
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <ostream>
 #include <string.h>
 #include <string>
 #include <sys/socket.h>
@@ -40,14 +42,24 @@ void cache::saveCache(string req, vector<char> r, int thread_id) {
   // cannot be cached
   if (control.find("no cache") != string::npos ||
       control.find("no store") != string::npos) {
-    cout << "ID: " << thread_id;
+    cout << thread_id << ": ";
     cout << "not cacheable because " << control << endl;
+    std::ofstream file;
+    file.open("proxy.log", std::ios::app);
+    file << thread_id << " : "
+         << "not cacheable because " << control << endl;
+    file.close();
     return;
   }
   // not 200 OK
   if (!curr.get_status()) {
-    cout << "ID: " << thread_id;
+    cout << thread_id << ": ";
     cout << "not cacheable because not 200 OK" << endl;
+    std::ofstream file;
+    file.open("proxy.log", std::ios::app);
+    file << thread_id << " : "
+         << "not cacheable because not 200 OK" << endl;
+    file.close();
     return;
   }
   // evict by LRU
@@ -57,6 +69,11 @@ void cache::saveCache(string req, vector<char> r, int thread_id) {
     url = url.substr(0, url.find(' '));
     cout << "(no id) ";
     cout << "NOTE evicted " << url << " from cache" << endl;
+    std::ofstream file;
+    file.open("proxy.log", std::ios::app);
+    file << "(no id)"
+         << "Note evicted  " << url << " from cache" << endl;
+    file.close();
     way.erase(way.begin());
     pair<string, pair<vector<char>, int>> curr = make_pair(req, info);
     way.insert(curr);
@@ -66,14 +83,29 @@ void cache::saveCache(string req, vector<char> r, int thread_id) {
     if (!expire_time.empty()) {
       // need revalidate
       if (control.find("must-revalidate") != string::npos) {
-        cout << "ID: " << thread_id;
+        cout << thread_id << ": ";
         cout << "cached, but requires revalidation" << endl;
+        std::ofstream file;
+        file.open("proxy.log", std::ios::app);
+        file << thread_id << " : "
+             << "cached, but requires revalidation" << endl;
+        file.close();
       }
-      cout << "ID: " << thread_id;
+      cout << thread_id << ": ";
       cout << "cached, but expires at " << expire_time << endl;
+      std::ofstream file;
+      file.open("proxy.log", std::ios::app);
+      file << thread_id << " : "
+           << "cached, but expires at " << expire_time << endl;
+      file.close();
     } else {
-      cout << "ID: " << thread_id;
+      cout << thread_id << ": ";
       cout << "cached" << endl;
+      std::ofstream file;
+      file.open("proxy.log", std::ios::app);
+      file << thread_id << " : "
+           << "cached" << endl;
+      file.close();
     }
     pair<string, pair<vector<char>, int>> curr = make_pair(req, info);
     way.insert(curr);
@@ -108,8 +140,13 @@ bool cache::getCache(string req, int client_fd, int thread_id) {
     // curr.parse_response();
     string control = curr.get_cache_control();
     if (control.find("must-revalidate") != string::npos) {
-      cout << "ID: " << id;
+      cout << id << ": ";
       cout << "in cache, requires validation" << endl;
+      std::ofstream file;
+      file.open("proxy.log", std::ios::app);
+      file << id << " : "
+           << "in cache, requires validation" << endl;
+      file.close();
       way.erase(way.find(req));
       return false;
     }
@@ -117,9 +154,17 @@ bool cache::getCache(string req, int client_fd, int thread_id) {
     string expire_time = curr.get_expire_time();
     string curr_time = curr.get_date();
     if (expire_time.empty()) {
-      cout << "ID: " << id;
+      cout << id << ": ";
       cout << "in cache, valid" << endl;
       cout << "Responding HTTP/1.1 200 OK" << endl;
+      std::ofstream file;
+      file.open("proxy.log", std::ios::app);
+      file << id << " : "
+           << "in cache, valid" << endl;
+      file << id << " : "
+           << "Responding HTTP/1.1 200 OK" << endl;
+
+      file.close();
       //      send(client_fd, &resp, resp.size(), 0);
 
       int sbyte;
@@ -140,13 +185,25 @@ bool cache::getCache(string req, int client_fd, int thread_id) {
       return true;
     } else {
       if (curr.check_expire()) {
-        cout << "ID: " << id;
+        cout << id << ": ";
         cout << "in cache, but expires at " << expire_time << endl;
+        std::ofstream file;
+        file.open("proxy.log", std::ios::app);
+        file << id << " : "
+             << "in cache, but expires at " << expire_time << endl;
+        file.close();
+
         way.erase(way.find(req));
         return false;
       } else {
-        cout << "ID: " << id;
+        cout << id << ": ";
         cout << "in cache, valid" << endl;
+        std::ofstream file;
+        file.open("proxy.log", std::ios::app);
+        file << id << " : "
+             << "in cache, valid" << endl;
+        file.close();
+
         //        send(client_fd, &resp, resp.size(), 0);
 
         int sbyte;
@@ -170,8 +227,14 @@ bool cache::getCache(string req, int client_fd, int thread_id) {
       }
     }
   } else {
-    cout << "ID: " << thread_id;
+    cout << thread_id << ": ";
     cout << "not in cache" << endl;
+    std::ofstream file;
+    file.open("proxy.log", std::ios::app);
+    file << thread_id << " : "
+         << "not in cache" << endl;
+    file.close();
+
     return false;
   }
   // pthread_mutex_unlock(&lock);

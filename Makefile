@@ -8,4 +8,4 @@ proxy: $(OBJS)
 	g++ $(CPPFLAGS) -c $< -lpthread
 
 clean:
-	rm proxy *~ *.o
+	rm -f proxy *~ *.o
