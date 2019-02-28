@@ -2,9 +2,11 @@
 #include "cache.h"
 #include "proxy.h"
 #include <arpa/inet.h>
+#include <fstream>
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <ostream>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -12,6 +14,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
 using namespace std;
 void ClientRequest::loop_recv_length(int fd, vector<char> &to_recv,
                                      int recv_length) {
@@ -35,10 +38,10 @@ void ClientRequest::parse_request(const char *request) {
   temp = curr.substr(0, header_end + 4);
   header = temp;
   while (temp.size() > 2) {
-    std::size_t pos = temp.find("\n");
-    temp[pos - 1] = '\0';
-    my_request.push_back(temp.substr(0, pos - 1));
-    temp = temp.substr(pos + 1);
+    std::size_t pos = temp.find("\r");
+    // temp[pos - 1] = '\0';
+    my_request.push_back(temp.substr(0, pos));
+    temp = temp.substr(pos + 2);
     j++;
   }
 }
@@ -100,7 +103,7 @@ void ClientRequest::get_hostname() {
   if (Method == "GET" || Method == "POST") {
     size_t pos1 = my_request[1].find(" ");
     size_t pos2 = my_request[1].find("\r");
-    Host = my_request[1].substr(pos1 + 1, pos2);
+    Host = my_request[1].substr(pos1 + 1, pos2 - pos1);
     // cout << "H: " << Host << endl;
   }
 }
@@ -123,20 +126,20 @@ void ClientRequest::handle_request(MyProxy myproxy, cache &mycache,
   if (pos != std::string::npos) {
     Host = client_request.substr(pos);
     size_t pos2 = Host.find(" ");
-    Host = Host.substr(pos2);
+    Host = Host.substr(pos2 + 1);
     size_t pos3 = Host.find("\r");
-    Host[pos3] = '\0';
-    Host = Host.substr(1, pos3);
+    // Host[pos3] = '\0';
+    Host = Host.substr(0, pos3);
 
     if (Method == "CONNECT") {
       size_t com = Host.find(":");
       if (com != std::string::npos) {
         Host = Host.substr(0, com);
-        Host.push_back('\0');
-        //cout << com << endl;
+        // Host.push_back('\0');
+        // cout << com << endl;
       }
     }
-    //cout << Host << endl;
+    // cout << Host << endl;
   }
 
   // print current time
@@ -148,11 +151,17 @@ void ClientRequest::handle_request(MyProxy myproxy, cache &mycache,
   cout << '"' << my_request[0] << " from ";
   struct hostent *host_entry;
   char myhostname[512];
-  gethostname(myhostname,sizeof(myhostname));
+  gethostname(myhostname, sizeof(myhostname));
   host_entry = gethostbyname(myhostname);
-  char *ip =inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
-  cout<<ip<<" @ ";
+  char *ip = inet_ntoa(*((struct in_addr *)host_entry->h_addr_list[0]));
+  cout << ip << " @ ";
   cout << asctime(time_info) << endl;
+  std::ofstream file;
+  file.open("proxy.log", std::ios_base::app | std::ios_base::out);
+  file << thread_id << " : " << '"' << my_request[0] << '"' << " from ";
+  file << ip << " @ " << asctime(time_info) << endl;
+  file.close();
+
   // get_hostname();
   if (Method == "GET") {
     handle_get(myproxy, mycache, thread_id);
@@ -190,7 +199,7 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache, int thread_id) {
     cu_request.append("\r\n");
     cu_request.append(agent);
   }
-  //cout << "My_request now: " << cu_request << endl;
+  // cout << "My_request now: " << cu_request << endl;
   cu_request.append("\r\n\r\n");
   // int end = client_request.find("\n");
   // string url = client_request.substr(0, end);
@@ -218,18 +227,22 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache, int thread_id) {
       response.resize(response.size() + 1);
       index += nbytes;
     }
-    //cout << "Header size: " << response.size() << endl;
+    std::ofstream file;
+    file.open("proxy.log", std::ios_base::app | std::ios_base::out);
+    file << thread_id << " : Received HTTP 200 OK from " << Host << endl;
+    file.close();
+    // cout << "Header size: " << response.size() << endl;
     string response_header(response.begin(), response.end());
 
     int sbyte;
     int send_index = 0;
-    //cout << "Response Size: before merge " << response.size() << endl;
+    // cout << "Response Size: before merge " << response.size() << endl;
 
     while (send_index < (int)response.size() - 1) {
       sbyte = send(client_connection_fd, &response.data()[send_index],
                    response.size() - send_index, 0);
       send_index += sbyte;
-      //cout << sbyte << endl;
+      // cout << sbyte << endl;
     }
     vector<char> response_body(1, 0);
     int receiving;
@@ -244,7 +257,7 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache, int thread_id) {
       temp = temp.substr(0, found);
       int response_body_len = atoi(temp.c_str());
       if (response_body_len != 0) {
-        //cout << "Found len!" << endl;
+        // cout << "Found len!" << endl;
         /*
         while ((receiving = recv(conn_fd, &response_body.data()[i], 1, 0)) >
         0&&i<response_body_len) { cout<<receiving<<endl; if(i ==
@@ -258,20 +271,20 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache, int thread_id) {
         sth.resize(response_body_len);
         receiving =
             recv(conn_fd, &sth.data()[0], response_body_len, MSG_WAITALL);
-        //cout << receiving << endl;
+        // cout << receiving << endl;
         // response.insert(response.end(), sth.begin(), sth.end());
-        //cout << sth.data() << endl;
+        // cout << sth.data() << endl;
         close(conn_fd);
-        //int s =
-            send(client_connection_fd, &sth.data()[0], response_body_len, 0);
-        close(conn_fd);
-        //cout << s << endl;
+        // int s =
+        send(client_connection_fd, &sth.data()[0], response_body_len, 0);
+
+        // cout << s << endl;
       }
 
     } else if (response_header.find(
                    "chunked")) { //----------recv till the end------
       while ((receiving = recv(conn_fd, &response_body.data()[i], 1, 0)) > 0) {
-        if (response_body.size() > 4) {
+        if (response_body.size() > 5) {
           size_t size = response_body.size();
           if (response_body.back() == '\n' && response_body[size - 2] == '\r' &&
               response_body[size - 3] == '\n' &&
@@ -326,7 +339,7 @@ void ClientRequest::handle_get(MyProxy myproxy, cache &mycache, int thread_id) {
     */
     // close(conn_fd);
     // close(client_connection_fd);
-    //cout << response.data() << endl;
+    // cout << response.data() << endl;
     mycache.saveCache(url, response, thread_id);
     cout << "returned from save cache" << endl;
   }
@@ -347,9 +360,9 @@ void ClientRequest::handle_post(MyProxy myproxy) {
   }
   */
   conn_fd = myproxy.connect_with_server(Host.c_str(), "80");
-  merge_request();
+  //  merge_request();
   int length = find_content_length();
-  //cout << length << endl;
+  cout << length << endl;
   vector<char> content(1, 0);
 
   int i = 0;
@@ -363,25 +376,28 @@ void ClientRequest::handle_post(MyProxy myproxy) {
       cout << i << endl;
     }
   }
+  cout << i << endl;
+  // content.resize(content.size() - 1);
   send(conn_fd, header.c_str(), header.size(), 0);
   int j = 0;
-  while ((s = send(conn_fd, &content.data()[j], 100, 0)) == 100) {
-    j += s;
-    if (j == length) {
+  while ((s = send(conn_fd, &content.data()[j], 1, 0)) > 0) {
+    if (j == length - 1) {
       break;
     }
+    j += s;
+    // content.resize(content.size() + 1);
   }
   if (length == 0) {
     cerr << "Wrong length" << endl;
     exit(EXIT_FAILURE);
   }
 
-  vector<char> response(100, 0);
+  vector<char> response(1, 0);
   int nbytes;
   int index = 0;
 
-  while ((nbytes = recv(conn_fd, &response.data()[index], 100, 0)) > 0) {
-    response.resize(response.size() + 100);
+  while ((nbytes = recv(conn_fd, &response.data()[index], 1, 0)) > 0) {
+    response.resize(response.size() + 1);
     index += nbytes;
     if (index == length) {
       break;
@@ -392,10 +408,10 @@ void ClientRequest::handle_post(MyProxy myproxy) {
   int sbyte;
   int send_index = 0;
   while ((sbyte = send(client_connection_fd, &response.data()[send_index], 100,
-                       0)) == 100) {
+                       0)) > 0) {
     send_index += 100;
   }
-  //cout << response.data() << endl;
+  cout << response.data() << endl;
   close(conn_fd);
   return;
 }
@@ -442,7 +458,7 @@ void ClientRequest::handle_connect(MyProxy myproxy) {
         int nbytes;
         nbytes = recv(fd_list[i], &response.data()[0], 500000, 0);
         response.resize(nbytes);
-	//std::cout << "Receice " << nbytes;
+        // std::cout << "Receice " << nbytes;
         if (nbytes == 0) {
           sign_break = 1;
           close(conn_fd);
@@ -461,7 +477,7 @@ void ClientRequest::handle_connect(MyProxy myproxy) {
               send(fd_list[other], &response.data()[sent], nbytes - sent, 0);
           sent += temp;
         }
-        //cout << " Sent " << sent << " bytes" << endl;
+        // cout << " Sent " << sent << " bytes" << endl;
       }
     }
     if (sign_break == 1) {

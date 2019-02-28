@@ -20,10 +20,10 @@ void response::parse_response() {
   string temp;
   string curr = server_response;
   while (curr.size() > 2) {
-    std::size_t pos = curr.find("\n");
-    curr[pos - 1] = '\0';
-    my_response.push_back(curr.substr(0, pos - 1));
-    curr = curr.substr(pos + 1);
+    std::size_t pos = curr.find("\r");
+    // curr[pos - 1] = '\0';
+    my_response.push_back(curr.substr(0, pos));
+    curr = curr.substr(pos + 2);
     // cout << my_response[i] << endl;
     i++;
   }
@@ -88,7 +88,7 @@ bool response::check_expire() {
   // cout << "age: " << age << endl;
   maxAge = convert_maxAge();
   // cout << "maxage: " << maxAge << endl;
-  modify_date(time(0));
+  // modify_date(time(0));
   if (age > maxAge) {
     return true;
   } else {

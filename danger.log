@@ -1,0 +1,15 @@
+Danger Log
+2/18: Implement simple proxy with GET.
+2/19: GET is good with Prof Younes homepage and awsome.txt.
+2/20: Implement POST method, strange with firefox prompt window to open a file.
+2/21: Changed POST implemention, can upload file on a website.
+2/22: Tried to implement CONNECT, get response with NETWORK PROTOCOL ERROR.
+2/23: FIxed it with while loop in sending and recving info from both sides.
+2/24: Implement Cache in GET method.
+2/24: Cannot show the advertisements on YouTube.
+2/25: Threads fixed that.
+2/26: Google will not jump to the dest URL in searching immediately, need to wait at least 5 mins.
+2/26: Fixed the GET method to deal with chunked and content-length.
+2/27: After one thread finish, it will not return to the main funciton immediately, which cause our web page takes a really long time to finish, which also result in you cannot click the other URLs to other pages, might give you protocol error or the proxy will abort.
+2/27: The cache will work if you refresh the web twice. The reason is same as above. We didn't find a solution to this problem.
+2/27: Our thread is slow, and you'd better click twice to get a page. slow, and you'd better click twice to get a page.
